@@ -1,0 +1,65 @@
+#!/bin/bash
+
+# Author: Jhonathan Olaya
+# Description: This script is used to install Microsoft Intune on Rocky Linux 9.
+# Updated: Added logging functionality and adapted for Rocky Linux 9
+
+# Specify the log file path
+LOG_FILE="/var/log/linux2intune.log"
+
+# Start of the script
+echo "$(date): Starting the script." >> "$LOG_FILE"
+
+# Get Rocky Linux version
+ROCKY_VERSION=$(cat /etc/redhat-release)
+
+# Verify if Rocky Linux version is 9
+if ! [[ "$ROCKY_VERSION" =~ "Rocky Linux release 9" ]]; then
+    echo "Unsupported Rocky Linux version. This script supports Rocky Linux 9 only."
+    echo "$(date): Unsupported Rocky Linux version - $ROCKY_VERSION" >> "$LOG_FILE"
+    exit 1
+fi
+
+# Check if Microsoft Intune app is already installed
+if rpm -q intune-portal &> /dev/null; then
+    echo "\033[33mMicrosoft Intune is already installed. Skipping installation.\033[0m"
+    echo "$(date): Microsoft Intune is already installed." >> "$LOG_FILE"
+else
+    # Install Microsoft Intune
+    echo "Starting installation of Microsoft Intune..."
+    echo "$(date): Starting installation of Microsoft Intune." >> "$LOG_FILE"
+
+    # Install curl and GPG
+    echo "Installing dependencies..."
+    sudo dnf install curl gpg -y
+
+    # Download and install the Microsoft package signing key
+    echo "Adding Microsoft package signing key..."
+    curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor >microsoft.gpg
+    sudo install -o root -g root -m 644 microsoft.gpg /etc/pki/rpm-gpg/
+    echo -e "[intune]\nname=Microsoft Intune repository\nbaseurl=https://packages.microsoft.com/yumrepos/intune\nenabled=1\ngpgcheck=1\ngpgkey=file:///etc/pki/rpm-gpg/microsoft.gpg" | sudo tee /etc/yum.repos.d/intune.repo
+    sudo rm microsoft.gpg
+
+    # Update package repositories
+    echo "Updating package repositories..."
+    sudo dnf makecache
+
+    # Install the Microsoft Intune app
+    echo "Installing Microsoft Intune..."
+    sudo dnf install intune-portal -y
+
+    # Check if Microsoft Intune app has been installed
+    if rpm -q intune-portal &> /dev/null; then
+        echo "Microsoft Intune installed successfully."
+        echo "$(date): Microsoft Intune installed successfully." >> "$LOG_FILE"
+        # Start the application
+        echo "Installation complete. Starting Application now."
+        intune-portal
+    else
+        echo "Microsoft Intune installation failed."
+        echo "$(date): Microsoft Intune installation failed." >> "$LOG_FILE"
+    fi
+fi
+
+# End of the script
+echo "$(date): Script finished." >> "$LOG_FILE"
